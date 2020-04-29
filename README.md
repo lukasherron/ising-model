@@ -3,7 +3,7 @@ Simulation and analysis of the ising model outside the Boltzmann regime.
 
 File Index
 
-  - ising_canonical_simulator_fixed_temp.py
+  - 
       - Simulator for canonical ising model using Metropolis - Hastings algorithm. The simulator is primarily used in initalizing the microcanonical lattice at a specific temperature.
     
   - ising_microcanonical.py
