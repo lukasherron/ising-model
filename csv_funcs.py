@@ -4,18 +4,15 @@ Created on Fri Mar 20 16:06:01 2020
 
 @author: Lukas Herron
 """
+
 import csv
 import os
 import numpy as np
 
 
 
- data_dir = '/ufrc/pdixit/lukasherron/ising_data' +str(new_dir)
- current_dir = '/ufrc/pdixit/lukasherron/ising_sim'
-    
-    
 def find(name, path):
-     '''
+    '''
     Parameters
     ----------
     name : file to be seached for (string)
@@ -43,11 +40,11 @@ def getnum(path):
     Returns
     -------
     num: An integer that allows identical simulations to be distinguished
-    '''
 
+    '''
     num = 0
     for root, dirs, files in os.walk(path):
-        for name in files:
+        for name in dirs:
             i = name.find('num')
             testnum = int(name[i+4:i+8])
             if testnum > num:
@@ -73,6 +70,8 @@ def mkdir(initial_dtype, initial_value,  N , n, subsites):
             using lattice and simulation properties.
 
     '''
+    from ising_args import current_dir
+    from ising_args import data_dir
     os.chdir(data_dir)
     num = getnum(data_dir) + 1
     new_dir = str(initial_dtype) + '=' + str(initial_value) + \
@@ -100,21 +99,23 @@ def create_file(init_type, init_value , N, n, subsites, num):
             initial_dtype=initial_value_lattice=NxN_subsites=mxm_samples=n_num=xxxx
 
     '''
+    from ising_args import current_dir
+    from ising_args import data_dir
     c = 0
     while c == 0:
         os.chdir(data_dir)
-        
         filename = str(init_type) + '=' + str(init_value) + \
         '_lattice='+str(N) + 'x' + str(N) + '_subsites=' + str(subsites) \
         + '_samples=' + str(n) + '_num=' +  str(num).zfill(4)+'.txt'
         if find(filename, data_dir) == 'false':
             c += 1
+            #open(str(filename), 'w')
             os.chdir(current_dir)
             return filename
         
 
 def write_to_file(filename, data, new_dir):
-     '''
+    '''
     
 
     Parameters
@@ -129,14 +130,15 @@ def write_to_file(filename, data, new_dir):
     None. Writes data to .txt file
 
     '''
-    data_dir_1 = data_dir +str(new_dir)
-    os.chdir(data_dir_1)
+    from ising_args import current_dir
+    from ising_args import data_dir
+    data_dir_new= data_dir + str(new_dir)
+    os.chdir(data_dir_new)
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter = '\t')
         writer.writerows(data)
     os.chdir(current_dir)        
 
-    
 def loaddata(path, col):
     '''
     
@@ -152,13 +154,17 @@ def loaddata(path, col):
     data : 1D array of data correspong to one of the arguments of format_data(...)
 
     '''
+
     data = []
     cwd = os.getcwd()
     os.chdir(path)
+    
     for filename in os.walk(path):
-        with open(filename, mode = 'r') as file:
-            single_data = np.loadtxt(file, delimiter='\t', usecols = col, unpack=True)
-            data = np.append(data, single_data)
+        files = filename[2]
+        for i in files:
+            with open(str(i), mode = 'r') as file:
+                single_data = np.loadtxt(file, delimiter='\t', usecols = col, unpack=True)
+                data = np.append(data, single_data)
     os.chdir(cwd)
     return data
 
@@ -188,6 +194,8 @@ def format_data(data1, data2, data3, data4, data5):
         master_arr[i][3] = data4[i]
         master_arr[i][4] = data5[i]
     return master_arr
+        
+
 
 
     
@@ -195,4 +203,3 @@ def format_data(data1, data2, data3, data4, data5):
         
         
     
-
