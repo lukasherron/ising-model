@@ -5,8 +5,8 @@ Created on Mon Feb 10 16:05:19 2020
 @author: Lukas Herron
 """
 import numpy as np
-import ising_canonical_simulator_fixed_temp as canonical
-import csv_funcs_local as csv
+import csv_funcs as csv
+import os
 
 def initialize_lattice_mag(N, mag):
     '''
@@ -46,7 +46,7 @@ def initialize_lattice_mag(N, mag):
                     lattice[x][y] = -1
     return lattice
 
-def initialize_lattice_temp(N, time, T):
+def initialize_lattice_temp(N, time, temp):
     '''
     Parameters
     ----------
@@ -64,19 +64,8 @@ def initialize_lattice_temp(N, time, T):
     annealing to temp. Has dependence on ising_canonical_simulator_fixed_temp.py.
 
     '''
-    lattice = np.zeros((N,N),dtype=np.int8)
-    for i in range(N):
-        for j in range(N):
-            x = int(2*np.random.random())
-            if x == 1:
-                lattice[i][j] = 1
-            else:
-                lattice[i][j] = -1
-        
-    for i in range(time):
-        for j in range(N):
-            for k in range(N):
-                lattice = canonical.main(lattice, j, k, T)
+    import ising_canonical_simulator_fixed_temp as canonical 
+    lattice = canonical.main(N, time, temp)
     return lattice
             
     
@@ -107,27 +96,29 @@ def hamiltonian(lattice):
     n = len(lattice[0][:])
     for i in range(n):
         for j in range(n):
-            if i > 0:
-                if lattice[i][j] == lattice[(i-1)% n][j]:
-                    H += -J/2
-                else:
-                    H += J/2
-            if i < n - 1:
-                if lattice[i][j] == lattice[(i+1)% n][j]:
-                    H += -J/2
-                else:
-                    H += J/2
-            if j < n - 1:
-                if lattice[i][j] == lattice[i][(j+1)% n]:
-                    H += -J/2
-                else:
-                    H += J/2
-            if j>0:
-                if lattice[i][j] == lattice[i][(j-1)% n]:
-                    H += -J/2
-                else:
-                    H += J/2
+            H += -J/2*lattice[i][j]*find_neighbors(lattice,i,j)
     return H
+
+def find_neighbors(lattice,i,j):
+    n = len(lattice[0][:])
+    if i > 0:
+        l = lattice[i-1][j]
+    else:
+        l = 0
+    if i < n-1:
+        r = lattice[i+1][j]
+    else:
+        r = 0
+    if j < n-1:
+        u = lattice[i][j+1]
+    else:
+        u = 0
+    if j >0:
+        d = lattice[i][j-1]
+    else:
+        d = 0
+    
+    return l + r + u + d
 
 
 def hamiltonian_wrapped(lattice):
@@ -157,22 +148,10 @@ def hamiltonian_wrapped(lattice):
     n = len(lattice[0][:])
     for i in range(n):
         for j in range(n):
-            if lattice[i][j] == lattice[(i-1)%n][j]:
-                H += -J/2
-            else:
-                H += J/2
-            if lattice[i][j] == lattice[(i+1)%n][j]:
-                H += -J/2
-            else:
-                H += J/2
-            if lattice[i][j] == lattice[i][(j+1)%n]:
-                H += -J/2
-            else:
-                H += J/2
-            if lattice[i][j] == lattice[i][(j-1)%n]:
-                H += -J/2
-            else:
-                H += J/2
+                H += lattice[i][j]*lattice[(i-1)%n][j]*-J/2
+                H += lattice[i][j]*lattice[(i+1)%n][j]*-J/2
+                H += lattice[i][j]*lattice[i][(j+1)%n]*-J/2
+                H += lattice[i][j]*lattice[i][(j-1)%n]*-J/2
     return H
 
 
@@ -204,7 +183,7 @@ def step(lattice, i, j, demon_energy, upper_bound):
     the demon_energy.
     
     '''
-    J = 2
+    J = 1
     E1 = 0
     E0 = 0
     
@@ -212,34 +191,50 @@ def step(lattice, i, j, demon_energy, upper_bound):
     
     if lattice[i][j] == lattice[(i-1)% N][j]:
         E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
     if lattice[i][j] == lattice[(i+1)% N][j]:
         E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
     if lattice[i][j] == lattice[i][(j+1)% N]:
         E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
     if lattice[i][j] == lattice[i][(j-1)% N]:
         E0 += -J
-    
-    if lattice[i][j] != lattice[(i-1)% N][j]:
+        E1 += J
+    else:
+        E0 += J
         E1 += -J
-    if lattice[i][j] != lattice[(i+1)% N][j]:
-        E1 += -J
-    if lattice[i][j] != lattice[i][(j+1)% N]:
-        E1 += -J
-    if lattice[i][j] != lattice[i][(j-1)% N]:
-        E1 += -J
-    
-    dE = E1 - E0
+
+    dE = E0 - E1
     if dE <= demon_energy and demon_energy - dE <= upper_bound and demon_energy - dE >= 0:
         demon_energy -= dE
         lattice[i][j] *= -1
     
     return lattice, demon_energy
 
-def main(initial_dtype, initial_value, steps, N, n, lattice, demon_energy, upper_bound, m, subsites, mode):
+def main(initial_dtype, initial_value, steps, N, n, lattice, demon_energy,\
+         upper_bound, m, subsites, data_dir, current_dir, mode):
     '''
     Parameters
     ----------
+    initial_dtype: "temp" or "mag" - the method by which the lattice was initalized
+    
+    initial_value: numerical value assigned to "temp" or "mag"
+    
     steps : The number of times the step(...) function is to be called.
+    
+    N: Size of initalized lattice.
+    
+    n: Number of samples to be acquired (stop simulation condition)
     
     lattice : 2D array to be evolved of over steps = s.
     
@@ -286,7 +281,8 @@ def main(initial_dtype, initial_value, steps, N, n, lattice, demon_energy, upper
     arr = []
     lattice_energy, lattice_mag, sample_energy, sample_mag, ssites = [], [], [], [], []
     timer, num = 0,0
-    new_dir = csv.mkdir(initial_dtype, initial_value,  N , n, subsites)
+    new_dir = csv.mkdir(initial_dtype, initial_value,  N , n, subsites, data_dir, current_dir)
+    path = str(data_dir)+ str(new_dir)
     
     for i in range(steps):
         x = int(len(lattice[0][:])*np.random.random())
@@ -295,21 +291,22 @@ def main(initial_dtype, initial_value, steps, N, n, lattice, demon_energy, upper
         timer += 1
         
         if timer % m == 0 and mode == 'write':
-                lattice_energy = np.append(lattice_energy, hamiltonian_wrapped(lattice))
-                lattice_mag    = np.append(lattice_mag, "{:.3f}".format(magnetization(lattice)))
-                arr = np.append(arr, demon_energy)
-                sample, int_f = random_sample_sites(lattice, subsites)
-                ssites = np.append(ssites, int_f)
-                sample_energy = np.append(sample_energy, hamiltonian(sample))
-                sample_mag = np.append(sample_mag, "{:.3f}".format(magnetization(sample)))
+            lattice_energy = np.append(lattice_energy, hamiltonian_wrapped(lattice))
+            lattice_mag    = np.append(lattice_mag, "{:.3f}".format(magnetization(lattice)))
+            arr = np.append(arr, demon_energy)
+            sample, int_f = random_sample_sites(lattice, subsites)
+            ssites = np.append(ssites, int_f)
+            sample_energy = np.append(sample_energy, hamiltonian(sample))
+            sample_mag = np.append(sample_mag, "{:.3f}".format(magnetization(sample)))
 
         if len(lattice_energy) == 10000:
+            os.chdir(path)
             master = csv.format_data(lattice_energy, sample_energy, lattice_mag, sample_mag, ssites)
-            filename = csv.create_file(initial_dtype, initial_value , N, n, subsites, num)
-            csv. write_to_file(filename, master, new_dir)
+            filename = csv.create_file(initial_dtype, initial_value, N, n, subsites, path)
+            csv.write_to_file(filename, master)
             lattice_energy, lattice_mag, sample_energy, sample_mag = [], [], [], []
             num += 1
-            
+            os.chdir(current_dir)
             
     return lattice, lattice_energy, lattice_mag, arr, sample_energy, sample_mag, ssites
 
@@ -333,14 +330,14 @@ def random_sample_sites(lattice, length):
     Notes:
         - The lattice configuration is stored as an integer. Flattening the 2D sample
             array gives a string of the form 111-1-1...1. The transformation -1 --> 0
-            is apllied to give a binary number, that is then converted to a base 10 int.
+            is applied to give a binary number, that is then converted to a base 10 int.
             Each integer corresponds to a unique configuration of the small site.
 
     '''
     N = len(lattice[0][:])
     sample = np.zeros((length,length),dtype=np.int8)
-    x = int(((len(lattice[0][:])-length))*np.random.random())
-    y = int(((len(lattice[:][0])-length))*np.random.random())
+    x = int(((len(lattice[0][:])-length-1))*np.random.random())
+    y = int(((len(lattice[:][0])-length-1))*np.random.random())
     for i in range(length):
         for j in range(length):
             sample[i][j] = lattice[(x + i)%N][(y + j)%N]
@@ -453,5 +450,6 @@ def heat_capacity(energy, temeprature):
     '''
     C = abs((energy[-1] - energy[-2])/(temeprature[-1] - temeprature[-2]))
     return C
+
 
 

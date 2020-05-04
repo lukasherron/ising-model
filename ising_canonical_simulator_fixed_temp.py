@@ -5,10 +5,21 @@ Created on Mon Feb 10 16:05:19 2020
 @author: Lukas Herron
 """
 import numpy as np
-import matplotlib.pyplot as plt
-import scipy.signal as sci
+from ising_microcanonical_defs import hamiltonian
 
 def makelattice(N):
+    '''
+    
+
+    Parameters
+    ----------
+    N : Length of one side of NxN lattice
+
+    -------
+    Description: Randomly assigns 1 or -1 to each of the N**2 spin sites and
+    returns the simulation lattice.
+
+    '''
     lattice = np.zeros((N,N),dtype=np.int8)
     for i in range(N):
         for j in range(N):
@@ -17,58 +28,57 @@ def makelattice(N):
                 lattice[i][j] = 1
             else:
                 lattice[i][j] = -1
-    return lattice, lattice
+    return lattice
 
+def quench(lattice, i, j, T):
+    '''
+    Parameters
+    ----------
+    lattice : Simulation lattice
+    i : i-th row of lattice
+    j : j-th column of lattice
+    T : temperature to quench to
 
-    
-def hamiltonian(lattice):
-    J = 1
-    H = 0
-    for i in range(N):
-        for j in range(N):
-            if lattice[i][j] == lattice[(i-1)% N][j]:
-                H += -J/2
-            else:
-                H += J/2
-            if lattice[i][j] == lattice[(i+1)% N][j]:
-                H += -J/2
-            else:
-                H += J/2
-            if lattice[i][j] == lattice[i][(j+1)% N]:
-                H += -J/2
-            else:
-                H += J/2
-            if lattice[i][j] == lattice[i][(j-1)% N]:
-                H += -J/2
-            else:
-                H += J/2
-    return H
+    -------
+    Description:
+        
+        Using the metropolis-hastings algorithm the lattice is quenched (annealed)
+        to temperature T.
 
-def main(lattice, i, j, T):
+    '''
     beta = 1/T
     J = 1
-    E_0 = 0
-    E_a = 0
+    E0 = 0
+    E1 = 0
+    N = len(lattice[0][:])
     if lattice[i][j] == lattice[(i-1)% N][j]:
-        E_0 += -J
+        E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
     if lattice[i][j] == lattice[(i+1)% N][j]:
-        E_0 += -J
+        E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
     if lattice[i][j] == lattice[i][(j+1)% N]:
-        E_0 += -J
+        E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
     if lattice[i][j] == lattice[i][(j-1)% N]:
-        E_0 += -J
+        E0 += -J
+        E1 += J
+    else:
+        E0 += J
+        E1 += -J
+
         
-    if lattice[i][j] != lattice[(i-1)% N][j]:
-        E_a += -J
-    if lattice[i][j] != lattice[(i+1)% N][j]:
-        E_a += -J
-    if lattice[i][j] != lattice[i][(j+1)% N]:
-        E_a += -J
-    if lattice[i][j] != lattice[i][(j-1)% N]:
-        E_a += -J
-        
-    if  E_a > E_0:
-        tolerance = np.exp(-beta*(E_a - E_0))
+    if  E1 > E0:
+        tolerance = np.exp(-beta*(E1 - E0))
         x = np.random.random()
         if x < tolerance:
             lattice[i][j] = -lattice[i][j]
@@ -78,65 +88,26 @@ def main(lattice, i, j, T):
             
     return lattice
 
-def magnetization(lattice):
-    mag = np.sum(lattice)/len(lattice)**2
-    return mag
+def main(N, time, T):
+    '''
+    
 
-#%%
+    Parameters
+    ----------
+    N : Length of one side of NxN simulation lattice
+    time : time parameter dictating how quickly the lattice is quenched
+    T : temperature to quench to 
 
-N = 10
-m = 1000
+    Returns
+    -------
+    lattice : Lattice quenched to temperature T
 
-#%%
-#lattice1, initial_lattice = makelattice(N)
-#energy, mag, time, C, time = [], [], [], [], np.linspace(0,m,m)
-#autocorr = []
-#timer = 0
-#t = N**2
-#T = 1
-#fig6 = plt.figure()
-#fig6 = plt.imshow(lattice1)
-#for i in time:
-#    for j in range(N):
-#        for k in range(N):
-#            lattice1 = main(lattice1, j, k, T)
-#            timer += 1
-#            if timer == t:
-#                energy = np.append(energy, hamiltonian(lattice1))
-#                mag    = np.append(mag, magnetization(lattice1))
-#                timer = 0
-#
-#fig3 = plt.figure()
-#fig3 = plt.plot(time[2:], energy[2:])
-#plt.xscale('linear')
-#plt.xlabel('time')
-#plt.ylabel('Energy')
-#plt.title('Energy')
-#
-#fig4 = plt.figure()
-#fig4 = plt.plot(time[2:], mag[2:])
-#plt.xscale('linear')
-#plt.xlabel('time')
-#plt.ylabel('Magnetization')
-#plt.title('Magnetization')
-#
-#fig5 = plt.figure()
-#fig5 = plt.hist(energy[2:],20)
-#plt.xlabel('Energy')
-#plt.ylabel('frequency')
-#plt.title('Energy')
-#
-#fig8 = plt.figure()
-#fig8 = plt.hist(mag[2:],20)
-#plt.xlabel('Magnetization')
-#plt.ylabel('frequency')
-#plt.title('Magnetization')
-#
-#
-#fig6 = plt.figure()
-#fig6 = plt.imshow(lattice1 + initial_lattice)
-#
-#fig7 = plt.figure()
-#fig7 = plt.imshow(lattice1)
-#%%
+    '''
+    lattice = makelattice(N)
+    for i in range(len(lattice[0][:])**2*time):
+        x = int(len(lattice[0][:])*np.random.random())
+        y = int(len(lattice[:][0])*np.random.random())
+        lattice = quench(lattice, x, y, T)
+
+    return lattice
 
