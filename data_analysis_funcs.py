@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Fri Mar 20 21:53:23 2020
@@ -9,27 +10,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv_funcs as csv
 from ising_microcanonical_defs import hamiltonian
+from ising_canonical_simulator_defs import match_canonical
+from ising_canonical_simulator_defs import get_energy_dist
+from ising_canonical_simulator_defs import KL_divergence
+from ising_canonical_simulator_defs import force_match
 
 
-def find_partition(beta, energy_dist):
-    ''' NOT IN USE. NEED TO FIX'''
-    Z = 0
-    for i in energy_dist:
-        Z += np.exp(-beta*i)
-    return Z
-
-def find_p(beta, energy_dist):
-    ''' NOT IN USE. NEED TO FIX'''
-    p_i = []
-    for i in energy_dist:
-        p_i = np.append(p_i, np.exp(-beta*i))
-    
-    return p_i/np.sum(p_i)
 
 def match_avg_energy(energy_sim, p_sim, energy_ss, p_ss, betas):
     '''
     
-
     Parameters
     ----------
     energy_sim :1D array of simulation energy distribution
@@ -37,83 +27,26 @@ def match_avg_energy(energy_sim, p_sim, energy_ss, p_ss, betas):
     energy_ss : 1D array of small site energy distribution
     p_ss : 1D array of probabilities corresponding to energy_ss
     betas : array of beta values to match
-
     Returns
     -------
     p_fit : probability distribution corresponding to matched <E>
     beta_fit : beta corresponding to matched <E> distribution
 
     '''
-    p_i = []
+    p = []
     avg_E_sim = np.sum(p_sim*energy_sim)
-    diff_fit = 100
-    beta_fit = 0
+    diff_fit = 1000
     for beta in betas:
-        for i in energy_sim:
-            p_i = np.append(p_i, np.exp(-beta*i))
-            p_i = p_i/np.sum(p_i)
-        p_p = p_ss*p_i
-        p_p = p_p/np.sum(p_p)
-        p_p = p_p[::-1]
-        avg_E_fit = np.sum(p_p*energy_ss)
+        for i in range(len(energy_sim)):
+            p = np.append(p, p_ss[i]*np.exp(-beta*energy_sim[i]))
+        p = p/np.sum(p)
+        avg_E_fit = np.sum(p*energy_ss)
         if abs(avg_E_sim - avg_E_fit) < diff_fit:
             diff_fit = abs(avg_E_sim - avg_E_fit)
             beta_fit = beta
-            p_fit = p_p
-        p_i = []
+            p_fit = p
+        p = []
     return p_fit, beta_fit
-
-
-def fit_beta(energy_dist, energy_counts, p_exp, betas):
-    ''' NEED TO FIX '''
-    min_diff = 100
-    min_beta = 0
-    for beta in betas:
-        diff = 0
-        x = energy_counts*find_p(beta, energy_dist)
-        p_x = x/np.sum(x)
-        for j in range(len(p_x)):
-            diff += abs(p_x[j] - p_exp[j])
-        if diff <= min_diff:
-            min_beta = beta
-            min_diff = diff
-    return min_beta, min_diff
-    
-    
-def get_energy_dist(energy):
-    '''
-    
-
-    Parameters
-    ----------
-    energy : 1D array of energies recorded in simulation
-
-    Returns
-    -------
-    energies : energy 'bins' of a histogram of energy
-    p : probability ofeach energy
-
-    '''
-    energies = []
-    for i in energy:
-        c = 0
-        for j in energies:
-            if i == j:
-                c = 1
-        if c == 0:
-            energies = np.append(energies, i)
-    energies = np.sort(energies)
-    hist, edges = np.histogram(energy, 100)
-    arr2 = []
-    for i in hist:
-        if i != 0:
-            arr2.append(i)
-    p = arr2/np.sum(arr2)
-    print(p)
-    print(energies)
-    return energies , p
-    
-
 
 def small_site_dist(n):
     '''
@@ -148,7 +81,7 @@ def small_site_dist(n):
             energies = np.append(energies, i)
 
     energies = np.sort(energies)
-    hist, edges = np.histogram(E, 100)
+    hist, edges = np.histogram(E, 1000)
     counts = []
     for i in hist:
         if i != 0:
@@ -179,6 +112,7 @@ def binary2energy(n):
     lat = np.array([])
     for i in range(2**n**2-1):
         s = str("{0:b}".format(i)).zfill(n**2)
+   
         for j in range(len(s)):
             if s[j] == str(1):
                 lat = np.append(lat, 1)
@@ -186,124 +120,45 @@ def binary2energy(n):
                 lat = np.append(lat, -1)
         lat = np.reshape(lat, (n,n))
         E = np.append(E, hamiltonian(lat))
-        lat = []
-        E = np.append(E, hamiltonian(np.ones((n,n))))
+        lat = np.array([])
+    # array of all ones (spin up) are not calculated from a binary number.
+    E = np.append(E, hamiltonian(np.ones((n,n))))
+                  
     return E
 
-def force_match(energy_ss, p_ss, energy_sim, p_sim):
-    '''
-    
 
-    Parameters
-    ----------
-    energy_ss : 1D array of sorted energy of small sites
-    p_ss : 1D array of probabilities corresponding to p_ss
-    energy_sim : 1D array of energy distribution from simulation
-    p_sim : 1D array of proababilities corresponding to energy_sim
-
-    Description:
-        When the calculated distibution of energies and the simulated distribution
-        of energies do not match due to some energy states not being explored in
-        the simulation, force_match(...) will expand the simulated energy distribution
-        and assign a probability of zero to the states that are not explored. This
-        makes all of the arrays the same length.
-
-    '''
-    big_ss = np.append(energy_ss, p_ss)
-    big_ss = np.reshape(big_ss,(2,len(energy_ss)))
-    big_sim = np.zeros((2,len(energy_ss)))
-    # print(big_sim)
-    print(big_ss)
-    for i in range(len(big_ss[0][:])):
-        big_sim[0][i] = big_ss[0][i]
-        for k in energy_sim:
-            for j in range(len(big_ss[0][:])):
-                if k == big_ss[0][j]:
-                    big_sim[1][j] = p_sim[j]
-    print(big_sim)
-    energy_sim_matched = big_sim[0][:]
-    p_sim_matched = big_sim[1][:]
-    return energy_sim_matched, p_sim_matched
                 
             
 
 #%%
     
-data_path = '/home/lukas/Ising Research/Data/local_data/temp=2.2_lattice=20x20_subsites=4_samples=10000_num=0195'
+data_path_1 = '/home/lukas/Ising Research/Data/HiPerGator_data/temp=2.28_lattice=25x25_subsites=4_samples=1000000_num=0016'
+n = 4
 
-energy =        csv.loaddata(data_path, 0)
-sample_energy = csv.loaddata(data_path, 1)
-mag =           csv.loaddata(data_path, 2)
-sample_mag =    csv.loaddata(data_path, 3)
+energy =        csv.loaddata(data_path_1, 0)
+sample_energy = csv.loaddata(data_path_1, 1)
+mag =           csv.loaddata(data_path_1, 2)
+sample_mag =    csv.loaddata(data_path_1, 3)
 
-hist, edges = np.histogram(energy, 100)
-counts = []
-for i in hist:
-    if i != 0:
-        counts.append(i)
-        
 #%%
         
-betas = np.linspace(0.001,10,1000)
-
-#%%
-energy_ss, p_ss, energy_counts_ss = small_site_dist(4)
-
-#%%
-
-
+betas = np.linspace(0.0001,1,1000)
+energy_ss, p_ss, energy_counts_ss = small_site_dist(n)
 energy_sim, p_sim = get_energy_dist(sample_energy)
-energy_sim, p_sim = force_match(energy_ss, p_ss, energy_sim, p_sim)
-beta_1, diff_1 = fit_beta(energy_sim, energy_counts_ss, p_sim, betas)
-p_2, beta_2 = match_avg_energy(energy_sim, p_sim, energy_ss, p_ss, betas)
+energy_sim, p_sim, energy_ss, p_ss = force_match(energy_ss, p_ss, energy_sim, p_sim, n)
 
-x_1 = p_ss*find_p(beta_1, energy_sim)
-p_1 = x_1/np.sum(x_1)
+p_2, beta_2 = match_avg_energy(energy_sim, p_sim, energy_ss, energy_counts_ss, betas)
 
-
-#%%
-
-
-print(beta_fit)
-    
-fig1 = plt.figure()
-fig1 = plt.plot(energy_sim, p_fit, '.', label = r'Matched <E>')
-fig1 = plt.plot(energy_sim, p_sim, '.', label =r'Simulated' )
-plt.legend()
-plt.ylabel('frequency')
-plt.title('Fit 1 Energy')
-
-fig1 = plt.figure()
-fig1 = plt.plot(energy_sim, p_1, '.', label = r'Minimized diff')
-plt.xlabel('Energy')
-plt.ylabel('frequency')
-plt.title('Fit 1 Energy')
-        
-        
-
-#%%
-# fig1 = plt.figure()
-# fig1 = plt.hist(sample_energy,40)
-# plt.xlabel('Energy')
-# plt.ylabel('frequency')
-# plt.title('Energy')
+div = KL_divergence(p_sim, p_2)
+print(div)
 
 fig2 = plt.figure()
-fig2 = plt.hist(sample_energy, 100)
+fig2 = plt.hist(sample_energy, 120)
 plt.xlabel('Energy')
 plt.ylabel('frequency')
 plt.title('Sample Energy')
 plt.xlim(-28,28)
 
-
-#%%
-
-
-fig1 = plt.figure()
-fig1 = plt.plot(energy_sim, p_1, '.', label = r'Minimized diff')
-plt.xlabel('Energy')
-plt.ylabel('frequency')
-plt.title('Fit 1 Energy')
 
 fig1 = plt.figure()
 fig1 = plt.plot(energy_sim, p_2, '.', label = r'Matching r$<E>$')
@@ -324,26 +179,59 @@ plt.plot(energy_sim, p_sim, '.', label = r'Experimental' )
 plt.legend()
 plt.xlabel('Energy')
 plt.ylabel('frequency')
-plt.title('Fit Energy')
+plt.title('Energy Distribution')
+
+fig1 = plt.figure(dpi = 1600)
+#plt.plot(energy_sim, p_1, '.', label = r'Minimized diff')
+plt.plot(energy_sim, np.log10(p_2), '.', label =r'Matching $<E>$')
+plt.plot(energy_sim, np.log10(p_sim), '.', label = r'Experimental' )
+plt.legend()
+plt.xlabel('Energy')
+plt.ylabel('frequency')
+plt.title('Energy Distribution (log plot)')
 plt.savefig('boltzmann_verification',dpi=1600)
 
 fig1 = plt.figure()
-fig1 = plt.plot(energy_sim, p_1 - p_sim, '.')
-plt.xlabel('Energy')
-plt.ylabel('frequency')
-plt.title('Fit 1 Energy Difference')
-
-fig1 = plt.figure()
-fig1 = plt.plot(energy_sim, p_2 - p_sim, '.')
-plt.xlabel('Energy')
-plt.ylabel('frequency')
-plt.title('Fit 2 Energy Difference')
-
-#%%
-energies_ss, p_ss, energy_counts = small_site_dist(4)
-fig1 = plt.figure()
-fig1 = plt.plot(energies_ss, p_ss, '.', label = r'small sites')
+fig1 = plt.plot(energy_ss,np.log10(p_ss), '.', label = r'small sites')
 plt.xlabel('Energy')
 plt.ylabel('frequency')
 plt.title('Small Site Energy')
 plt.xlim(-28,28)
+
+#%%
+
+
+data_path_2 = '/home/lukas/Ising Research/Data/HiPerGator_data/temp=3_lattice=100x100_subsites=6_samples=100000_num=0010'
+n = 6
+
+energy_2 =        csv.loaddata(data_path_2, 0)
+sample_energy_2 = csv.loaddata(data_path_2, 1)
+mag_2 =           csv.loaddata(data_path_2, 2)
+sample_mag_2 =    csv.loaddata(data_path_2, 3)
+
+energy_sim_2, p_sim_2 = get_energy_dist(sample_energy_2)
+
+beta_arr = np.linspace(0.1, 1, 100)
+min_KL, min_beta = match_canonical(p_sim_2, energy_sim_2, beta_arr , n, 10000)
+
+
+#%%
+from ising_canonical_simulator_defs import evolve_lattice
+n = 6
+beta_range = np.linspace(0.1, 1, 100)
+KL_arr = []
+for i in range(len(beta_range)):
+    e, p = evolve_lattice(beta_range[i], n, 10000)
+    e, p, energy_sim_2, p_sim_2 = force_match(energy_sim_2, p_sim_2, e, p, n)
+    KL = KL_divergence(p_sim_2, p)
+    KL_arr = np.append(KL_arr, KL)
+    
+
+fig1 = plt.figure()
+plt.plot(beta_range, KL_arr, '.')
+plt.xlabel(r"$\beta$")
+plt.ylabel('Kullback - Leibler Divergence')
+plt.title(r"6x6 site KL divergence vs $\beta$")
+
+    
+
