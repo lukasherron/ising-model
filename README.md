@@ -42,3 +42,8 @@ Simulation and analysis of the ising model outside the Boltzmann regime.
     For each sample the sample energy, magnetization, and boundary interaction energy is recorded, along with an integer corresponding the the lattice configuration if the subsite is smaller than 4x4. This bijection is found by mapping spin up to 1 and spin down to 0. Then the lattice is treated as an array and flattened to create a binary string. This string is converted to an integer that uniquely determines a subsite configuration. Additionally, the energy of the (topologically closed) lattice and it's magnetization are recorded.
     
    3. **Data Analysis**
+      1. Mathcing Canonical Distribution
+      2. Matching Superstatistical Distribution
+      3. Boundary Correlation
+      4. State Analysis
+   
