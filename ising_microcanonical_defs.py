@@ -64,8 +64,8 @@ def initialize_lattice_temp(N, time, temp):
     annealing to temp. Has dependence on ising_canonical_simulator_fixed_temp.py.
 
     '''
-    import ising_canonical_simulator_fixed_temp as canonical 
-    lattice = canonical.main(N, time, temp)
+    import ising_canonical_simulator_defs as canonical 
+    lattice, energy_arr = canonical.main(N, time, temp, mode_1 = 'none', s = N, mode_2 = "save_config")
     return lattice
             
     
@@ -100,6 +100,21 @@ def hamiltonian(lattice):
     return H
 
 def find_neighbors(lattice,i,j):
+    '''
+    
+
+    Parameters
+    ----------
+    lattice : 2D simulation array
+    i : i-th column of lattice
+    j : j-th row of lattice
+
+    Description:
+        
+        Finds the sum of the nearest neighbors (left, right, up, down). Used
+        in calculating the hamiltonian.
+
+    '''
     n = len(lattice[0][:])
     if i > 0:
         l = lattice[i-1][j]
@@ -154,6 +169,30 @@ def hamiltonian_wrapped(lattice):
                 H += lattice[i][j]*lattice[i][(j-1)%n]*-J/2
     return H
 
+def boundary_energy(lattice):
+    '''
+    
+
+    Parameters
+    ----------
+    lattice : 2D spin array sampled from simulation lattice
+
+    Returns
+    -------
+    boundary_energy : Energy across boundary of lattice (small site)
+        DESCRIPTION.
+
+    '''
+    J = 1
+    boundary_energy = 0
+    length = len(lattice[0][:]) - 1
+    for i in range(length):
+        boundary_energy += lattice[length][i]*lattice[length-1][i]*-J
+        boundary_energy += lattice[0][i]*lattice[1][i]*-J
+        boundary_energy += lattice[i][length]*lattice[i][length - 1]*-J
+        boundary_energy += lattice[i][0]*lattice[i][1]*-J
+            
+    return boundary_energy
 
 def step(lattice, i, j, demon_energy, upper_bound):
     '''
@@ -279,7 +318,7 @@ def main(initial_dtype, initial_value, steps, N, n, lattice, demon_energy,\
         
     '''
     arr = []
-    lattice_energy, lattice_mag, sample_energy, sample_mag, ssites = [], [], [], [], []
+    lattice_energy, lattice_mag, sample_energy, sample_mag, ssites, b_energy_arr = [], [], [], [], [], []
     timer, num = 0,0
     new_dir = csv.mkdir(initial_dtype, initial_value,  N , n, subsites, data_dir, current_dir)
     path = str(data_dir)+ str(new_dir)
@@ -294,19 +333,25 @@ def main(initial_dtype, initial_value, steps, N, n, lattice, demon_energy,\
             lattice_energy = np.append(lattice_energy, hamiltonian_wrapped(lattice))
             lattice_mag    = np.append(lattice_mag, "{:.3f}".format(magnetization(lattice)))
             arr = np.append(arr, demon_energy)
-            sample, int_f = random_sample_sites(lattice, subsites)
-            ssites = np.append(ssites, int_f)
-            sample_energy = np.append(sample_energy, hamiltonian(sample))
-            sample_mag = np.append(sample_mag, "{:.3f}".format(magnetization(sample)))
+            counter = 0
+            
+            while counter < 50:
+                sample, sample_boundary, int_f = random_sample_sites(lattice, subsites)
+                b_energy = boundary_energy(sample_boundary)
+                b_energy_arr = np.append(b_energy_arr, b_energy)
+                ssites = np.append(ssites, int_f)
+                sample_energy = np.append(sample_energy, hamiltonian(sample))
+                sample_mag = np.append(sample_mag, "{:.3f}".format(magnetization(sample)))
+                counter += 1
 
-        if len(lattice_energy) == 10000:
-            os.chdir(path)
-            master = csv.format_data(lattice_energy, sample_energy, lattice_mag, sample_mag, ssites)
-            filename = csv.create_file(initial_dtype, initial_value, N, n, subsites, path)
-            csv.write_to_file(filename, master)
-            lattice_energy, lattice_mag, sample_energy, sample_mag = [], [], [], []
-            num += 1
-            os.chdir(current_dir)
+            if len(sample_energy) >= 10000:
+                os.chdir(path)
+                master = csv.format_data(lattice_energy, sample_energy, b_energy_arr, lattice_mag, sample_mag, ssites)
+                filename = csv.create_file(initial_dtype, initial_value, N, n, subsites, path)
+                csv.write_to_file(filename, master)
+                lattice_energy, lattice_mag, sample_energy, sample_mag, ssites, b_energy_arr = [], [], [], [], [], []
+                num += 1
+                os.chdir(current_dir)
             
     return lattice, lattice_energy, lattice_mag, arr, sample_energy, sample_mag, ssites
 
@@ -336,24 +381,33 @@ def random_sample_sites(lattice, length):
     '''
     N = len(lattice[0][:])
     sample = np.zeros((length,length),dtype=np.int8)
-    x = int(((len(lattice[0][:])-length-1))*np.random.random())
-    y = int(((len(lattice[:][0])-length-1))*np.random.random())
+    boundary = sample = np.zeros((length + 2,length + 2),dtype=np.int8)
+    x = int(((len(lattice[0][:])-length-2))*np.random.random()) + 1
+    y = int(((len(lattice[:][0])-length-2))*np.random.random()) + 1
+
     for i in range(length):
         for j in range(length):
             sample[i][j] = lattice[(x + i)%N][(y + j)%N]
-    flattened = np.ndarray.flatten(sample)
-    str_f = list(flattened)
-    s = ''
-    for i in range(len(str_f)):
-        if str_f[i] == -1:
-            str_f[i] = 0
-    for i in range(len(str_f)):
-        s += str(str_f[i])
-    int_f = int(s, 2)
+    
+    for i in range(length + 2):
+        for j in range(length + 2):
+            boundary[i][j] = lattice[(x + i -1)%N][(y + j - 1)%N]
+    if N <= 4:
+        flattened = np.ndarray.flatten(sample)
+        str_f = list(flattened)
+        s = ''
+        for i in range(len(str_f)):
+            if str_f[i] == -1:
+                str_f[i] = 0
+        for i in range(len(str_f)):
+            s += str(str_f[i])
+        int_f = int(s, 2)
+    else:
+        int_f = 0
     
     
             
-    return sample, int_f
+    return sample, boundary, int_f
 
 def constant_sample_sites(lattice, length):
     '''
