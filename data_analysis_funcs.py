@@ -131,20 +131,21 @@ def binary2energy(n):
             
 
 #%%
-    
-data_path_1 = '/home/lukas/Ising Research/Data/HiPerGator_data/temp=2.28_lattice=25x25_subsites=4_samples=1000000_num=0016'
+data_path_1 = '/home/lukas/Ising Research/Data/HiPerGator_data/categorized_simulation_data/sample_size=04/temp=2.2_lattice=100x100_subsites=4_samples=100000_num=0017'
 n = 4
 
-energy =        csv.loaddata(data_path_1, 0)
-sample_energy = csv.loaddata(data_path_1, 1)
-mag =           csv.loaddata(data_path_1, 2)
-sample_mag =    csv.loaddata(data_path_1, 3)
+# RETURNS DATA IN HISTOGRAM FORMAT
+#energy =        csv.loaddata(data_path_1, 0)
+sample_energy, energy_sim = csv.loaddata(data_path_1, 1)
+#mag =           csv.loaddata(data_path_1, 2)
+#sample_mag =    csv.loaddata(data_path_1, 3)
 
-#%%
         
 betas = np.linspace(0.0001,1,1000)
 energy_ss, p_ss, energy_counts_ss = small_site_dist(n)
-energy_sim, p_sim = get_energy_dist(sample_energy)
+p_sim = get_energy_dist(sample_energy)
+print(len(p_sim))
+print(len(energy_sim))
 energy_sim, p_sim, energy_ss, p_ss = force_match(energy_ss, p_ss, energy_sim, p_sim, n)
 
 p_2, beta_2 = match_avg_energy(energy_sim, p_sim, energy_ss, energy_counts_ss, betas)
@@ -189,7 +190,7 @@ plt.legend()
 plt.xlabel('Energy')
 plt.ylabel('frequency')
 plt.title('Energy Distribution (log plot)')
-plt.savefig('boltzmann_verification',dpi=1600)
+#plt.savefig('boltzmann_verification',dpi=1600)
 
 fig1 = plt.figure()
 fig1 = plt.plot(energy_ss,np.log10(p_ss), '.', label = r'small sites')
@@ -201,8 +202,8 @@ plt.xlim(-28,28)
 #%%
 
 
-data_path_2 = '/home/lukas/Ising Research/Data/HiPerGator_data/temp=3_lattice=100x100_subsites=6_samples=100000_num=0010'
-n = 6
+data_path_2 = '/ufrc/pdixit/lukasherron/ising_data/temp=2.5_lattice=100x100_subsites=3_samples=100000_num=0012'
+n = 4
 
 energy_2 =        csv.loaddata(data_path_2, 0)
 sample_energy_2 = csv.loaddata(data_path_2, 1)
@@ -232,6 +233,11 @@ plt.plot(beta_range, KL_arr, '.')
 plt.xlabel(r"$\beta$")
 plt.ylabel('Kullback - Leibler Divergence')
 plt.title(r"6x6 site KL divergence vs $\beta$")
+
+#%%
+N = n
+var_p_fit = np.var(p_2)/N**2
+var_p_sim = np.var(p_sim)/N**2
 
     
 
