@@ -31,8 +31,6 @@ def find(name, path):
 
 def getnum(path):
     '''
-    
-
     Parameters
     ----------
     path : path to check filenames along
@@ -45,13 +43,14 @@ def getnum(path):
     num = 0
     for root, dirs, files in os.walk(path):
         for name in dirs:
+    
             i = name.find('num')
             testnum = int(name[i+4:i+8])
             if testnum > num:
                 num = testnum
     return num
 
-def mkdir(initial_dtype, initial_value,  N , n, subsites):
+def mkdir(initial_dtype, initial_value,  N , n, subsites, data_dir, current_dir):
     '''
     
 
@@ -70,21 +69,18 @@ def mkdir(initial_dtype, initial_value,  N , n, subsites):
             using lattice and simulation properties.
 
     '''
-    from ising_args import current_dir
-    from ising_args import data_dir
+
     os.chdir(data_dir)
     num = getnum(data_dir) + 1
-    new_dir = str(initial_dtype) + '=' + str(initial_value) + \
-        '_lattice='+str(N) + 'x' + str(N) + '_subsites=' + str(subsites) \
+    new_dir = str(initial_dtype) + '=' + str(initial_value).zfill(4) + \
+        '_lattice='+str(N) + 'x' + str(N) + '_subsites=' + str(subsites).zfill(4) \
         + '_samples=' + str(n) + '_num=' +  str(num).zfill(4)
     os.mkdir(new_dir)
     os.chdir(current_dir)
     return new_dir
 
-def create_file(init_type, init_value , N, n, subsites, num):
+def create_file(init_type, init_value , N, n, subsites, path):
     '''
-    
-
     Parameters
     ----------
     init_type : Str "temp" or "mag" corresponding to how the lattice was initialized
@@ -99,22 +95,21 @@ def create_file(init_type, init_value , N, n, subsites, num):
             initial_dtype=initial_value_lattice=NxN_subsites=mxm_samples=n_num=xxxx
 
     '''
-    from ising_args import current_dir
-    from ising_args import data_dir
+    
     c = 0
+    num = 0
     while c == 0:
-        os.chdir(data_dir)
-        filename = str(init_type) + '=' + str(init_value) + \
-        '_lattice='+str(N) + 'x' + str(N) + '_subsites=' + str(subsites) \
+        filename = str(init_type) + '=' + str(init_value).zfill(4) + \
+        '_lattice='+str(N) + 'x' + str(N) + '_subsites=' + str(subsites).zfill(4) \
         + '_samples=' + str(n) + '_num=' +  str(num).zfill(4)+'.txt'
-        if find(filename, data_dir) == 'false':
+        if find(filename, path) == 'false':
             c += 1
-            #open(str(filename), 'w')
-            os.chdir(current_dir)
-            return filename
+        num += 1
+        
+    return filename
         
 
-def write_to_file(filename, data, new_dir):
+def write_to_file(filename, data):
     '''
     
 
@@ -130,14 +125,9 @@ def write_to_file(filename, data, new_dir):
     None. Writes data to .txt file
 
     '''
-    from ising_args import current_dir
-    from ising_args import data_dir
-    data_dir_new= data_dir + str(new_dir)
-    os.chdir(data_dir_new)
     with open(filename, mode='w') as file:
         writer = csv.writer(file, delimiter = '\t')
         writer.writerows(data)
-    os.chdir(current_dir)        
 
 def loaddata(path, col):
     '''
@@ -154,21 +144,41 @@ def loaddata(path, col):
     data : 1D array of data correspong to one of the arguments of format_data(...)
 
     '''
-
-    data = []
+    l = 1000
+    data, hist, energy_dist = [], np.zeros(l-1), []
     cwd = os.getcwd()
     os.chdir(path)
-    
-    for filename in os.walk(path):
-        files = filename[2]
+    counter = 0
+    bins = []
+    for i in range(l):
+        bins = np.append(bins, -l/2 +0.5 + i)
+        
+    for root, dirs, filename in os.walk(path):
+        files = filename
         for i in files:
             with open(str(i), mode = 'r') as file:
-                single_data = np.loadtxt(file, delimiter='\t', usecols = col, unpack=True)
-                data = np.append(data, single_data)
+                single_data = csv.reader(file, delimiter='\t')
+                for k in single_data:
+                    if k[col] != "---" :
+                        data = np.append(data, float(k[col]))
+                        counter += 1
+                        if counter == 10000:
+                            for i in data:
+                                c = 0
+                                for j in energy_dist:
+                                    if i == j:
+                                        c += 1
+                                if c == 0:
+                                    energy_dist = np.append(energy_dist, i)
+                            temp_hist, edges = np.histogram(data, bins)
+                            hist += temp_hist
+                            counter = 0
+                            data = []
+    energy_dist = np.sort(energy_dist)
     os.chdir(cwd)
-    return data
+    return hist, energy_dist
 
-def format_data(data1, data2, data3, data4, data5):
+def format_data(data1, data2, data3, data4, data5, data6):
     '''
     
 
@@ -185,14 +195,31 @@ def format_data(data1, data2, data3, data4, data5):
     master_arr : for m input data sets of length n, all are read into a mxn 2D array
 
     '''
-    n = len(data1)
-    master_arr = np.zeros((n,5))
+    len_arr = []
+    len_arr = np.append(len_arr, len(data1))
+    len_arr = np.append(len_arr, len(data2))
+    len_arr = np.append(len_arr, len(data3))
+    len_arr = np.append(len_arr, len(data4))
+    len_arr = np.append(len_arr, len(data5))
+    len_arr = np.append(len_arr, len(data6))
+    n = int(max(len_arr))
+    master_arr = ["---"]*6*n
+    master_arr = np.reshape(master_arr, (n,6))
+
     for i in range(len(data1)):
-        master_arr[i][0] = data1[i]
-        master_arr[i][1] = data2[i]
-        master_arr[i][2] = data3[i]
-        master_arr[i][3] = data4[i]
-        master_arr[i][4] = data5[i]
+        master_arr[i][0] = str(data1[i])
+    for i in range(len(data2)):
+        master_arr[i][1] = str(data2[i])
+    for i in range(len(data3)):
+        master_arr[i][2] = str(data3[i])
+    for i in range(len(data4)):
+        master_arr[i][3] = str(data4[i])
+    for i in range(len(data5)):
+        master_arr[i][4] = str(data5[i])
+    for i in range(len(data6)):
+
+        master_arr[i][4] = str(data6[i])
+        
     return master_arr
         
 
