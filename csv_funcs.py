@@ -153,27 +153,28 @@ def loaddata(path, col):
     for i in range(l):
         bins = np.append(bins, -l/2 +0.5 + i)
         
-    for root, dirs, filename in os.walk(path):
-        files = filename
-        for i in files:
-            with open(str(i), mode = 'r') as file:
-                single_data = csv.reader(file, delimiter='\t')
-                for k in single_data:
-                    if k[col] != "---" :
-                        data = np.append(data, float(k[col]))
-                        counter += 1
-                        if counter == 10000:
-                            for i in data:
-                                c = 0
-                                for j in energy_dist:
-                                    if i == j:
-                                        c += 1
-                                if c == 0:
-                                    energy_dist = np.append(energy_dist, i)
-                            temp_hist, edges = np.histogram(data, bins)
-                            hist += temp_hist
-                            counter = 0
-                            data = []
+    for root, dirs, files in os.walk(path):
+            for directory in dirs:
+                print(path + '/' + directory)
+                for filename in os.listdir(path + '/' + directory):
+                    with open(path + '/' + directory + '/' + filename, mode = 'r') as file:
+                        single_data = csv.reader(file, delimiter='\t')
+                        for k in single_data:
+                            if k[col] != "---" :
+                                data = np.append(data, float(k[col]))
+                                counter += 1
+                                if counter == 10000:
+                                    for i in data:
+                                        c = 0
+                                        for j in energy_dist:
+                                            if i == j:
+                                                c += 1
+                                        if c == 0:
+                                            energy_dist = np.append(energy_dist, i)
+                                    temp_hist, edges = np.histogram(data, bins)
+                                    hist += temp_hist
+                                    counter = 0
+                                    data = []
     energy_dist = np.sort(energy_dist)
     os.chdir(cwd)
     return hist, energy_dist
