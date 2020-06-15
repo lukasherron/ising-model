@@ -146,6 +146,7 @@ def get_p_dist(energy_hist):
         if i != 0:
             arr2.append(i)
     p = arr2/np.sum(arr2)
+    print(p)
     return  p
 
 def get_energy_range(n):
