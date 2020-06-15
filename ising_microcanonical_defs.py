@@ -93,9 +93,9 @@ def hamiltonian(lattice):
     '''
     J = 1
     H = 0
-    n = len(lattice[0][:])
-    for i in range(n):
-        for j in range(n):
+    N = len(lattice[0][:])
+    for i in range(N):
+        for j in range(N):
             H += -J/2*lattice[i][j]*find_neighbors(lattice,i,j)
     return H
 
@@ -381,7 +381,7 @@ def random_sample_sites(lattice, length):
     '''
     N = len(lattice[0][:])
     sample = np.zeros((length,length),dtype=np.int8)
-    boundary = sample = np.zeros((length + 2,length + 2),dtype=np.int8)
+    boundary = np.zeros((length + 2,length + 2),dtype=np.int8)
     x = int(((len(lattice[0][:])-length-2))*np.random.random()) + 1
     y = int(((len(lattice[:][0])-length-2))*np.random.random()) + 1
 
@@ -470,6 +470,7 @@ def autocorr(x):
     pi = np.fft.ifft(p)
     return np.real(pi)[:n//2]/(np.arange(n//2)[::-1]+n//2)
 
+
 def magnetization(lattice):
     '''
     Parameters
@@ -486,24 +487,4 @@ def magnetization(lattice):
     '''
     mag = np.sum(lattice)/len(lattice)**2
     return mag
-
-def heat_capacity(energy, temeprature):
-    '''
-    Parameters
-    ----------
-    energy : TYPE
-        DESCRIPTION.
-    temeprature : TYPE
-        DESCRIPTION.
-    -------
-    
-    Unfinished function to be added to data analysis funcs that will calculate
-    the heat capacity of the lattice as a function of energy and temperature.
-    Should be moved to data_analysis_funcs.py
-
-    '''
-    C = abs((energy[-1] - energy[-2])/(temeprature[-1] - temeprature[-2]))
-    return C
-
-
 
