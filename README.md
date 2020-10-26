@@ -44,7 +44,7 @@ Testing the limits of the canonical ensemble
                 * __...__
                         
 # Script Sequence
-
+The scripts should be executed in the following order:
 1. __ising_args.py__: The script which executes the simulation procdeure. Is dependent on __ising_canonical_simulator_defs.py__, __ising_microcanonical_defs.py__, and __csv_funcs.py__.
 
 2. __generate_bayesian_array.py__: Finds the bayesian arrays p(E | beta) over a range of beta values.
